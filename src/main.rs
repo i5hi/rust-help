@@ -1,11 +1,11 @@
 use serde_derive::{Deserialize, Serialize};
 use std::str::{FromStr};
 use secp256k1::Secp256k1;
-use secp256k1::{ecdh::SharedSecret, KeyPair, PublicKey, SecretKey};
+use secp256k1::{ecdh::SharedSecret, KeyPair, PublicKey, XOnlyPublicKey, SecretKey};
 use bip39::{Language, Mnemonic};
 use bitcoin::network::constants::Network;
 use secp256k1::rand::rngs::OsRng;
-use bitcoin::util::bip32::ExtendedPrivKey;
+use bitcoin::util::bip32::{ExtendedPrivKey,ExtendedPubKey};
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -83,7 +83,7 @@ pub fn compute_shared_secret_str(
   };
 
   let pubkey = PublicKey::from_str(&public_key).unwrap();
-
+  
   let shared_secret = SharedSecret::new(&pubkey, &secret_key);
   let shared_secret_hex = hex::encode(&(shared_secret.secret_bytes()));
   shared_secret_hex
@@ -93,17 +93,43 @@ pub fn compute_shared_secret_str(
 mod tests {
   use super::*;
   use bitcoin::network::constants::Network;
+  // use bitcoin::util::bip32::{ExtendedPubKey};
 
   #[test]
   fn test_shared_secret() {
-    let seed = generate(24, "", Network::Bitcoin);
-    let key_pair = keypair_from_xprv_str(&seed.xprv);
-    let alice_pair = XOnlyPair::from_keypair(key_pair);
+    let secp = Secp256k1::new();
 
     let seed = generate(24, "", Network::Bitcoin);
-    let key_pair = keypair_from_xprv_str(&seed.xprv);
-    let bob_pair = XOnlyPair::from_keypair(key_pair);
-    
+    let mut key_pair = keypair_from_xprv_str(&seed.xprv);
+    let public_key = PublicKey::from_keypair(&key_pair);
+    let parity = public_key.to_string().remove(1);
+
+    if (parity == '3'){
+      let mut seckey = SecretKey::from_keypair(&key_pair);
+      seckey.negate_assign();
+      key_pair = KeyPair::from_secret_key(&secp, seckey); 
+    }
+    let alice_pair = XOnlyPair::from_keypair(key_pair.clone());
+    let public_key = PublicKey::from_keypair(&key_pair);
+
+    println!("ALICE PUB: {}",public_key.to_string());
+
+
+    let seed = generate(24, "", Network::Bitcoin);
+    key_pair = keypair_from_xprv_str(&seed.xprv);
+
+    let public_key = PublicKey::from_keypair(&key_pair);
+    let parity = public_key.to_string().remove(1);
+
+    if (parity == '3'){
+      let mut seckey = SecretKey::from_keypair(&key_pair);
+      seckey.negate_assign();
+      key_pair = KeyPair::from_secret_key(&secp, seckey);
+    }
+    let public_key = PublicKey::from_keypair(&key_pair);
+    let bob_pair = XOnlyPair::from_keypair(key_pair.clone());
+    println!("BOB PUB: {}",public_key.to_string());
+
     // Alice only has Bob's XOnlyPubkey string
     let alice_shared_secret =
       compute_shared_secret_str(&alice_pair.seckey, &bob_pair.pubkey);
