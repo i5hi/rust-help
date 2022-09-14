@@ -104,8 +104,11 @@ mod tests {
     let key_pair = keypair_from_xprv_str(&seed.xprv);
     let bob_pair = XOnlyPair::from_keypair(key_pair);
     
+    // Alice only has Bob's XOnlyPubkey string
     let alice_shared_secret =
       compute_shared_secret_str(&alice_pair.seckey, &bob_pair.pubkey);
+
+    // Bob only has Alice's XOnlyPubkey string
     let bob_shared_secret =
       compute_shared_secret_str(&bob_pair.seckey, &alice_pair.pubkey);
     assert_eq!(alice_shared_secret, bob_shared_secret);
